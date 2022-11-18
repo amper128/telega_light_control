@@ -16,13 +16,7 @@
  */
 
 #include "stm32f1xx_it.h"
-#include "main.h"
-
-extern DMA_HandleTypeDef hdma_tim1_ch1;
-extern DMA_HandleTypeDef hdma_tim1_ch2;
-extern TIM_HandleTypeDef htim3;
-
-extern volatile uint32_t led_work;
+#include <stm32f1xx_hal.h>
 
 /******************************************************************************/
 /*           Cortex-M3 Processor Interruption and Exception Handlers          */
@@ -124,13 +118,3 @@ SysTick_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32f1xx.s).                    */
 /******************************************************************************/
-
-/**
- * @brief This function handles TIM3 global interrupt.
- */
-void
-TIM3_IRQHandler(void)
-{
-	HAL_TIM_IRQHandler(&htim3);
-	led_work++;
-}

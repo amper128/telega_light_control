@@ -11,7 +11,8 @@ set(CMAKE_INCLUDE_CURRENT_DIR TRUE)
 file(GLOB_RECURSE p_headers "include/*.h")
 
 set(PROJECT_SOURCES
-	#src/ARGB.c
+	src/can.c
+	src/leds.c
 	src/main.c
 	src/stm32f1xx_hal_msp.c
 	src/stm32f1xx_it.c
@@ -42,6 +43,7 @@ set(EXTRA_FLAGS
 	-Wunused-function -Wunused-label -Wunused-parameter
 	-Wunused-value -Wunused-variable -Wvolatile-register-var
 	-Wwrite-strings -Wno-missing-field-initializers
+	-D__SOFTFP__
 	)
 foreach(_w ${EXTRA_FLAGS})
 	set(EXTRA_C_FLAGS "${EXTRA_C_FLAGS} ${_w}")
