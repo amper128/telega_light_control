@@ -45,6 +45,7 @@ typedef struct {
 	volatile uint32_t tim_dma_cc;
 	__IO uint32_t *tim_ccr;
 
+	size_t pixels;
 	uint8_t brightness;
 	volatile WS2815_STATE loc_state;
 

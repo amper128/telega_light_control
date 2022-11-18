@@ -51,9 +51,9 @@ HSV2RGB(uint8_t hue, uint8_t sat, uint8_t val, uint8_t *_r, uint8_t *_g,
 
 	int i = (int)floorf(h * 6);
 	float f = h * 6 - (float)i;
-	uint8_t p = (uint8_t)(v * (1 - s) * 255.0);
-	uint8_t q = (uint8_t)(v * (1 - f * s) * 255.0);
-	uint8_t t = (uint8_t)(v * (1 - (1 - f) * s) * 255.0);
+	uint8_t p = (uint8_t)(v * (1 - s) * 255.0f);
+	uint8_t q = (uint8_t)(v * (1 - f * s) * 255.0f);
+	uint8_t t = (uint8_t)(v * (1 - (1 - f) * s) * 255.0f);
 
 	switch (i % 6) {
 		// Src: https://stackoverflow.com/questions/3018313
@@ -64,22 +64,34 @@ HSV2RGB(uint8_t hue, uint8_t sat, uint8_t val, uint8_t *_r, uint8_t *_g,
 		//    uint8_t t = (val * (255 - ((sat * (255 - rem)) >> 8))) >>
 		//    8; switch (reg) {
 	case 0:
-		*_r = val, *_g = t, *_b = p;
+		*_r = val;
+		*_g = t;
+		*_b = p;
 		break;
 	case 1:
-		*_r = q, *_g = val, *_b = p;
+		*_r = q;
+		*_g = val;
+		*_b = p;
 		break;
 	case 2:
-		*_r = p, *_g = val, *_b = t;
+		*_r = p;
+		*_g = val;
+		*_b = t;
 		break;
 	case 3:
-		*_r = p, *_g = q, *_b = val;
+		*_r = p;
+		*_g = q;
+		*_b = val;
 		break;
 	case 4:
-		*_r = t, *_g = p, *_b = val;
+		*_r = t;
+		*_g = p;
+		*_b = val;
 		break;
 	default:
-		*_r = val, *_g = p, *_b = q;
+		*_r = val;
+		*_g = p;
+		*_b = q;
 		break;
 	}
 }
@@ -111,7 +123,7 @@ ws2815_TIM_DMADelayPulseCplt(DMA_HandleTypeDef *hdma)
 	}
 
 	// if data transfer
-	if (desc->BUF_COUNTER < NUM_PIXELS) {
+	if (desc->BUF_COUNTER < desc->pixels) {
 		// fill second part of buffer
 		for (volatile uint8_t i = 0; i < 8; i++) {
 			desc->PWM_BUF[i + 24] =
@@ -131,9 +143,12 @@ ws2815_TIM_DMADelayPulseCplt(DMA_HandleTypeDef *hdma)
 				: PWM_LO;
 		}
 		desc->BUF_COUNTER++;
-	} else if (desc->BUF_COUNTER < NUM_PIXELS + 2) { // if RET transfer
-		memset((uint32_t *)&desc->PWM_BUF[PWM_BUF_SIZE / 2], 0,
-		       (PWM_BUF_SIZE / 2) * sizeof(uint32_t)); // second part
+	} else if (desc->BUF_COUNTER < desc->pixels + 2) { // if RET transfer
+		for (volatile size_t i = (PWM_BUF_SIZE / 2); i < PWM_BUF_SIZE;
+		     i++) {
+			desc->PWM_BUF[i] = 0;
+		}
+		// second part
 		desc->BUF_COUNTER++;
 	} else { // if END of transfer
 		desc->BUF_COUNTER = 0;
@@ -176,7 +191,7 @@ ws2815_TIM_DMADelayPulseHalfCplt(DMA_HandleTypeDef *hdma)
 		return; // if no data to transmit - return
 	}
 	// if data transfer
-	if (desc->BUF_COUNTER < NUM_PIXELS) {
+	if (desc->BUF_COUNTER < desc->pixels) {
 		// fill first part of buffer
 		for (volatile uint8_t i = 0; i < 8; i++) {
 			desc->PWM_BUF[i] =
@@ -196,9 +211,10 @@ ws2815_TIM_DMADelayPulseHalfCplt(DMA_HandleTypeDef *hdma)
 				: PWM_LO;
 		}
 		desc->BUF_COUNTER++;
-	} else if (desc->BUF_COUNTER < NUM_PIXELS + 2) { // if RET transfer
-		memset((uint32_t *)desc->PWM_BUF, 0,
-		       (PWM_BUF_SIZE / 2) * sizeof(uint32_t)); // first part
+	} else if (desc->BUF_COUNTER < desc->pixels + 2) { // if RET transfer
+		for (volatile size_t i = 0; i < (PWM_BUF_SIZE / 2); i++) {
+			desc->PWM_BUF[i] = 0;
+		} // first part
 		desc->BUF_COUNTER++;
 	}
 }
@@ -311,7 +327,7 @@ void
 ws2815_setRGB(ws2815_desc_t *desc, size_t i, uint8_t r, uint8_t g, uint8_t b)
 {
 	// overflow protection
-	if (i >= NUM_PIXELS) {
+	if (i >= desc->pixels) {
 		return;
 	}
 
@@ -358,7 +374,7 @@ ws2815_setHSV(ws2815_desc_t *desc, size_t i, uint8_t hue, uint8_t sat,
 void
 ws2815_fillRGB(ws2815_desc_t *desc, uint8_t r, uint8_t g, uint8_t b)
 {
-	for (volatile size_t i = 0; i < NUM_PIXELS; i++) {
+	for (volatile size_t i = 0; i < desc->pixels; i++) {
 		ws2815_setRGB(desc, i, r, g, b);
 	}
 }
@@ -400,74 +416,74 @@ ws2815_show(ws2815_desc_t *desc)
 	if (desc->BUF_COUNTER != 0 ||
 	    desc->dma_handle.State != HAL_DMA_STATE_READY) {
 		return WS2815_BUSY;
-	} else {
-		for (volatile uint8_t i = 0; i < 8; i++) {
-			// set first transfer from first values
-			desc->PWM_BUF[i] =
-			    (((desc->RGB_BUF[0] << i) & 0x80) > 0) ? PWM_HI
-								   : PWM_LO;
-			desc->PWM_BUF[i + 8] =
-			    (((desc->RGB_BUF[1] << i) & 0x80) > 0) ? PWM_HI
-								   : PWM_LO;
-			desc->PWM_BUF[i + 16] =
-			    (((desc->RGB_BUF[2] << i) & 0x80) > 0) ? PWM_HI
-								   : PWM_LO;
-			desc->PWM_BUF[i + 24] =
-			    (((desc->RGB_BUF[3] << i) & 0x80) > 0) ? PWM_HI
-								   : PWM_LO;
-			desc->PWM_BUF[i + 32] =
-			    (((desc->RGB_BUF[4] << i) & 0x80) > 0) ? PWM_HI
-								   : PWM_LO;
-			desc->PWM_BUF[i + 40] =
-			    (((desc->RGB_BUF[5] << i) & 0x80) > 0) ? PWM_HI
-								   : PWM_LO;
-		}
-		HAL_StatusTypeDef DMA_Send_Stat = HAL_ERROR;
-		while (DMA_Send_Stat != HAL_OK) {
-			if (TIM_CHANNEL_STATE_GET(desc->htim,
-						  desc->tim_channel) ==
-			    HAL_TIM_CHANNEL_STATE_BUSY) {
-				DMA_Send_Stat = HAL_BUSY;
-				continue;
-			} else if (TIM_CHANNEL_STATE_GET(desc->htim,
-							 desc->tim_channel) ==
-				   HAL_TIM_CHANNEL_STATE_READY) {
-				TIM_CHANNEL_STATE_SET(
-				    desc->htim, desc->tim_channel,
-				    HAL_TIM_CHANNEL_STATE_BUSY);
-			} else {
-				DMA_Send_Stat = HAL_ERROR;
-				continue;
-			}
-
-			desc->dma_handle.XferCpltCallback =
-			    ws2815_TIM_DMADelayPulseCplt;
-			desc->dma_handle.XferHalfCpltCallback =
-			    ws2815_TIM_DMADelayPulseHalfCplt;
-			desc->dma_handle.XferErrorCallback = TIM_DMAError;
-			if (HAL_DMA_Start_IT(
-				&desc->dma_handle, (uint32_t)desc->PWM_BUF,
-				(uint32_t)desc->tim_ccr,
-				(uint16_t)PWM_BUF_SIZE) != HAL_OK) {
-				DMA_Send_Stat = HAL_ERROR;
-				continue;
-			}
-			__HAL_TIM_ENABLE_DMA(desc->htim, desc->tim_dma_cc);
-			if (IS_TIM_BREAK_INSTANCE(desc->htim->Instance) !=
-			    RESET)
-				__HAL_TIM_MOE_ENABLE(desc->htim);
-			if (IS_TIM_SLAVE_INSTANCE(desc->htim->Instance)) {
-				uint32_t tmpsmcr =
-				    desc->htim->Instance->SMCR & TIM_SMCR_SMS;
-				if (!IS_TIM_SLAVEMODE_TRIGGER_ENABLED(tmpsmcr))
-					__HAL_TIM_ENABLE(desc->htim);
-			} else
-				__HAL_TIM_ENABLE(desc->htim);
-			DMA_Send_Stat = HAL_OK;
-		}
-		desc->BUF_COUNTER = 2;
-		return WS2815_OK;
 	}
+
+	for (volatile uint8_t i = 0; i < 8; i++) {
+		// set first transfer from first values
+		desc->PWM_BUF[i] =
+		    (((desc->RGB_BUF[0] << i) & 0x80) > 0) ? PWM_HI : PWM_LO;
+		desc->PWM_BUF[i + 8] =
+		    (((desc->RGB_BUF[1] << i) & 0x80) > 0) ? PWM_HI : PWM_LO;
+		desc->PWM_BUF[i + 16] =
+		    (((desc->RGB_BUF[2] << i) & 0x80) > 0) ? PWM_HI : PWM_LO;
+		desc->PWM_BUF[i + 24] =
+		    (((desc->RGB_BUF[3] << i) & 0x80) > 0) ? PWM_HI : PWM_LO;
+		desc->PWM_BUF[i + 32] =
+		    (((desc->RGB_BUF[4] << i) & 0x80) > 0) ? PWM_HI : PWM_LO;
+		desc->PWM_BUF[i + 40] =
+		    (((desc->RGB_BUF[5] << i) & 0x80) > 0) ? PWM_HI : PWM_LO;
+	}
+
+	HAL_StatusTypeDef DMA_Send_Stat = HAL_ERROR;
+	while (DMA_Send_Stat != HAL_OK) {
+		if (TIM_CHANNEL_STATE_GET(desc->htim, desc->tim_channel) ==
+		    HAL_TIM_CHANNEL_STATE_BUSY) {
+			DMA_Send_Stat = HAL_BUSY;
+			continue;
+		}
+
+		if (TIM_CHANNEL_STATE_GET(desc->htim, desc->tim_channel) ==
+		    HAL_TIM_CHANNEL_STATE_READY) {
+			TIM_CHANNEL_STATE_SET(desc->htim, desc->tim_channel,
+					      HAL_TIM_CHANNEL_STATE_BUSY);
+		} else {
+			DMA_Send_Stat = HAL_ERROR;
+			continue;
+		}
+
+		desc->dma_handle.XferCpltCallback =
+		    ws2815_TIM_DMADelayPulseCplt;
+		desc->dma_handle.XferHalfCpltCallback =
+		    ws2815_TIM_DMADelayPulseHalfCplt;
+		desc->dma_handle.XferErrorCallback = TIM_DMAError;
+
+		if (HAL_DMA_Start_IT(&desc->dma_handle, (uint32_t)desc->PWM_BUF,
+				     (uint32_t)desc->tim_ccr,
+				     (uint16_t)PWM_BUF_SIZE) != HAL_OK) {
+			DMA_Send_Stat = HAL_ERROR;
+			continue;
+		}
+
+		__HAL_TIM_ENABLE_DMA(desc->htim, desc->tim_dma_cc);
+		if (IS_TIM_BREAK_INSTANCE(desc->htim->Instance) != RESET) {
+			__HAL_TIM_MOE_ENABLE(desc->htim);
+		}
+
+		if (IS_TIM_SLAVE_INSTANCE(desc->htim->Instance)) {
+			uint32_t tmpsmcr =
+			    desc->htim->Instance->SMCR & TIM_SMCR_SMS;
+			if (!IS_TIM_SLAVEMODE_TRIGGER_ENABLED(tmpsmcr)) {
+				__HAL_TIM_ENABLE(desc->htim);
+			}
+		} else {
+			__HAL_TIM_ENABLE(desc->htim);
+		}
+
+		DMA_Send_Stat = HAL_OK;
+	}
+	desc->BUF_COUNTER = 2;
+
+	return WS2815_OK;
 }
 
 /** @} */ // Driver
