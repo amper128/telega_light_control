@@ -60,12 +60,12 @@ main(void)
 
 	MX_USART1_UART_Init();
 
+	can_start();
+	leds_init();
+
 	/* основной таймер */
 	MX_TIM3_Init();
 	HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_1);
-
-	can_start();
-	leds_init();
 
 	/* Infinite loop */
 	while (1) {
