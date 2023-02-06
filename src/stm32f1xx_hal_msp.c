@@ -52,6 +52,10 @@ HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef *htim_base)
 		/* TIM1 DMA DeInit */
 		HAL_DMA_DeInit(htim_base->hdma[TIM_DMA_ID_CC1]);
 		HAL_DMA_DeInit(htim_base->hdma[TIM_DMA_ID_CC2]);
+		HAL_DMA_DeInit(htim_base->hdma[TIM_DMA_ID_CC3]);
+		HAL_DMA_DeInit(htim_base->hdma[TIM_DMA_ID_CC4]);
+		HAL_DMA_DeInit(htim_base->hdma[TIM_DMA_ID_TRIGGER]);
+		HAL_DMA_DeInit(htim_base->hdma[TIM_DMA_ID_COMMUTATION]);
 	} else if (htim_base->Instance == TIM3) {
 		/* Peripheral clock disable */
 		__HAL_RCC_TIM3_CLK_DISABLE();

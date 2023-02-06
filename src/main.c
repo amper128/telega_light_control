@@ -29,7 +29,9 @@ static void MX_DMA_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART1_UART_Init(void);
 
+#ifndef CAN_ADDRESS
 #define CAN_ADDRESS (100U)
+#endif
 
 static volatile uint32_t led_counter = 0U;
 

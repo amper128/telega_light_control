@@ -13,14 +13,22 @@
 #include <leds.h>
 #include <proto/vesc_proto.h>
 
+#define GP1_Pin GPIO_PIN_12
+#define GP1_GPIO_Port GPIOB
+#define GP2_Pin GPIO_PIN_13
+#define GP2_GPIO_Port GPIOB
+#define GP3_Pin GPIO_PIN_14
+#define GP3_GPIO_Port GPIOB
+#define GP4_Pin GPIO_PIN_15
+#define GP4_GPIO_Port GPIOB
 #define PWM1_Pin GPIO_PIN_8
 #define PWM1_GPIO_Port GPIOA
 #define PWM2_Pin GPIO_PIN_9
 #define PWM2_GPIO_Port GPIOA
-#define GP2_Pin GPIO_PIN_10
-#define GP2_GPIO_Port GPIOA
-#define GP1_Pin GPIO_PIN_11
-#define GP1_GPIO_Port GPIOA
+#define PWM3_Pin GPIO_PIN_10
+#define PWM3_GPIO_Port GPIOA
+#define PWM4_Pin GPIO_PIN_11
+#define PWM4_GPIO_Port GPIOA
 #define LED1_Pin GPIO_PIN_3
 #define LED1_GPIO_Port GPIOB
 #define LED2_Pin GPIO_PIN_4
@@ -66,7 +74,9 @@ static led_mode_funcion_t leds_modes[LEDS_MODE_MAX] = {
     [LEDS_MODE_FLASHING] = led_mode_flashing,
     [LEDS_MODE_POLICE] = led_mode_fso};
 
-static leds_desc_t leds[2U] = {
+static leds_desc_t leds[4U] = {
+    {.color = {64U, 32U, 0U}, .mode = LEDS_MODE_FADING, .period = 20U},
+    {.color = {64U, 0U, 0U}, .mode = LEDS_MODE_STATIC_COLOR, .period = 20U},
     {.color = {64U, 32U, 0U}, .mode = LEDS_MODE_FADING, .period = 20U},
     {.color = {64U, 0U, 0U}, .mode = LEDS_MODE_STATIC_COLOR, .period = 20U}};
 
@@ -79,12 +89,18 @@ leds_init(void)
 
 	leds[0U].ws.pixels = 46U;
 	leds[1U].ws.pixels = 8U;
+	leds[2U].ws.pixels = 8U;
+	leds[3U].ws.pixels = 8U;
 
 	ws2815_init(&leds[0U].ws, &htim1, TIM_CHANNEL_1);
 	ws2815_init(&leds[1U].ws, &htim1, TIM_CHANNEL_2);
+	ws2815_init(&leds[2U].ws, &htim1, TIM_CHANNEL_3);
+	ws2815_init(&leds[3U].ws, &htim1, TIM_CHANNEL_4);
 
 	ws2815_set_brightness(&leds[0U].ws, 255);
 	ws2815_set_brightness(&leds[1U].ws, 255);
+	ws2815_set_brightness(&leds[2U].ws, 255);
+	ws2815_set_brightness(&leds[3U].ws, 255);
 
 	ws2815_clear(&leds[0U].ws);
 	ws2815_clear(&leds[1U].ws);
@@ -495,6 +511,14 @@ pwm_timer_init(void)
 	    HAL_OK) {
 		Error_Handler();
 	}
+	if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_3) !=
+	    HAL_OK) {
+		Error_Handler();
+	}
+	if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_4) !=
+	    HAL_OK) {
+		Error_Handler();
+	}
 	sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
 	sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
 	sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
@@ -516,7 +540,9 @@ leds_gpio_init(void)
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOA, GP2_Pin | GP1_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(
+	    GPIOB, GP1_Pin | GP2_Pin | GP3_Pin | GP4_Pin | LED1_Pin | LED2_Pin,
+	    GPIO_PIN_RESET);
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(GPIOB, LED1_Pin | LED2_Pin, GPIO_PIN_RESET);
@@ -563,8 +589,10 @@ HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim)
 		/**TIM1 GPIO Configuration
 		PA8     ------> TIM1_CH1
 		PA9     ------> TIM1_CH2
+		PA10     ------> TIM1_CH3
+		PA11     ------> TIM1_CH4
 		*/
-		GPIO_InitStruct.Pin = PWM1_Pin | PWM2_Pin;
+		GPIO_InitStruct.Pin = PWM1_Pin | PWM2_Pin | PWM3_Pin | PWM4_Pin;
 		GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
 		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
 		HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
